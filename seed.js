@@ -1,115 +1,96 @@
 /**
- * Popula o banco com catálogo, cursos, recompensas e FAQ
+ * Popula o banco (Supabase/Postgres) com catálogo, cursos, recompensas e FAQ
  * Rode: node seed.js
  */
-const db = require("./db");
+const { db } = require("./db");
 const path = require("path");
+const fs = require("fs");
+const vm = require("vm");
 
-// Carrega os dados estáticos do frontend (mesmo arquivo)
+// Carrega os dados estáticos do frontend (mesmo arquivo de sempre)
 const dadosPathFlat = path.join(__dirname, "dados.js");
 const dadosPathNested = path.join(__dirname, "..", "frontend", "dados.js");
-const dadosPath = require("fs").existsSync(dadosPathFlat) ? dadosPathFlat : dadosPathNested;
-const codigo = require("fs").readFileSync(dadosPath, "utf8");
+const dadosPath = fs.existsSync(dadosPathFlat) ? dadosPathFlat : dadosPathNested;
+const codigo = fs.readFileSync(dadosPath, "utf8");
 
 // Avalia de forma segura o módulo dados.js (só declara const)
 const sandbox = {};
-const vm = require("vm");
 vm.createContext(sandbox);
-vm.runInContext(codigo + "\n; this.CATALOGO = CATALOGO; this.CURSOS = CURSOS; this.RECOMPENSAS = RECOMPENSAS; this.FAQ = FAQ;", sandbox);
+vm.runInContext(
+  codigo + "\n; this.CATALOGO = CATALOGO; this.CURSOS = CURSOS; this.RECOMPENSAS = RECOMPENSAS; this.FAQ = FAQ;",
+  sandbox
+);
 
 const { CATALOGO, CURSOS, RECOMPENSAS, FAQ } = sandbox;
 
-const insertPlanta = db.prepare(`
-  INSERT OR REPLACE INTO plantas
-  (id, nome, cientifico, emoji, imagem, preco, categoria, ambiente, luz, agua, umidade, porte, dificuldade, pet_friendly, resumo, historia)
-  VALUES (@id, @nome, @cientifico, @emoji, @imagem, @preco, @categoria, @ambiente, @luz, @agua, @umidade, @porte, @dificuldade, @pet_friendly, @resumo, @historia)
-`);
-
-const insertCurso = db.prepare(`
-  INSERT OR REPLACE INTO cursos (id, titulo, nivel, duracao, emoji, imagem, descricao, link, brotos)
-  VALUES (@id, @titulo, @nivel, @duracao, @emoji, @imagem, @descricao, @link, @brotos)
-`);
-
-const insertAula = db.prepare(`
-  INSERT OR IGNORE INTO curso_aulas (curso_id, ordem, titulo) VALUES (?, ?, ?)
-`);
-
-const insertRecompensa = db.prepare(`
-  INSERT OR REPLACE INTO recompensas (id, nome, descricao, custo, emoji, tipo, valor)
-  VALUES (@id, @nome, @descricao, @custo, @emoji, @tipo, @valor)
-`);
-
-const insertFaq = db.prepare(`
-  INSERT INTO faq (pergunta, resposta, ordem) VALUES (?, ?, ?)
-`);
-
-const run = db.transaction(() => {
-  // Limpa dados estáticos para re-seed limpo
-  // Recria plantas para garantir coluna imagem em bancos antigos
-  db.exec("DELETE FROM curso_aulas; DELETE FROM recompensas; DELETE FROM faq;");
-  db.exec("DROP TABLE IF EXISTS cursos;");
-  db.exec(`CREATE TABLE cursos (
-  id TEXT PRIMARY KEY, titulo TEXT NOT NULL, nivel TEXT NOT NULL, duracao TEXT NOT NULL,
-  emoji TEXT, imagem TEXT, descricao TEXT, link TEXT, brotos INTEGER NOT NULL DEFAULT 0
-)`);
-  db.exec("DROP TABLE IF EXISTS plantas;");
-  db.exec(`CREATE TABLE plantas (
-  id TEXT PRIMARY KEY, nome TEXT NOT NULL, cientifico TEXT NOT NULL, emoji TEXT, imagem TEXT,
-  preco REAL NOT NULL, categoria TEXT NOT NULL, ambiente TEXT NOT NULL, luz TEXT NOT NULL,
-  agua TEXT NOT NULL, umidade TEXT NOT NULL, porte TEXT NOT NULL, dificuldade TEXT NOT NULL,
-  pet_friendly INTEGER NOT NULL DEFAULT 0, resumo TEXT, historia TEXT, ativo INTEGER NOT NULL DEFAULT 1
-)`);
+async function seed() {
+  // curso_aulas e faq são recriadas do zero a cada seed
+  await db.query("DELETE FROM curso_aulas");
+  await db.query("DELETE FROM faq");
 
   for (const p of CATALOGO) {
-    insertPlanta.run({
-      id: p.id,
-      nome: p.nome,
-      cientifico: p.cientifico,
-      emoji: p.emoji,
-      imagem: p.imagem || null,
-      preco: p.preco,
-      categoria: p.categoria,
-      ambiente: p.ambiente,
-      luz: p.luz,
-      agua: p.agua,
-      umidade: p.umidade,
-      porte: p.porte,
-      dificuldade: p.dificuldade,
-      pet_friendly: p.petFriendly ? 1 : 0,
-      resumo: p.resumo,
-      historia: p.historia
-    });
+    await db.query(
+      `
+      INSERT INTO plantas (id, nome, cientifico, emoji, imagem, preco, categoria, ambiente, luz, agua, umidade, porte, dificuldade, pet_friendly, resumo, historia)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+      ON CONFLICT (id) DO UPDATE SET
+        nome=EXCLUDED.nome, cientifico=EXCLUDED.cientifico, emoji=EXCLUDED.emoji, imagem=EXCLUDED.imagem,
+        preco=EXCLUDED.preco, categoria=EXCLUDED.categoria, ambiente=EXCLUDED.ambiente, luz=EXCLUDED.luz,
+        agua=EXCLUDED.agua, umidade=EXCLUDED.umidade, porte=EXCLUDED.porte, dificuldade=EXCLUDED.dificuldade,
+        pet_friendly=EXCLUDED.pet_friendly, resumo=EXCLUDED.resumo, historia=EXCLUDED.historia
+      `,
+      [
+        p.id, p.nome, p.cientifico, p.emoji, p.imagem || null, p.preco, p.categoria, p.ambiente,
+        p.luz, p.agua, p.umidade, p.porte, p.dificuldade, p.petFriendly ? 1 : 0, p.resumo, p.historia
+      ]
+    );
   }
 
   for (const c of CURSOS) {
-    insertCurso.run({
-      id: c.id,
-      titulo: c.titulo,
-      nivel: c.nivel,
-      duracao: c.duracao,
-      emoji: c.emoji,
-      imagem: c.imagem || null,
-      descricao: c.descricao,
-      link: c.link,
-      brotos: c.brotos
-    });
-    c.aulas.forEach((titulo, i) => insertAula.run(c.id, i, titulo));
+    await db.query(
+      `
+      INSERT INTO cursos (id, titulo, nivel, duracao, emoji, imagem, descricao, link, brotos)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      ON CONFLICT (id) DO UPDATE SET
+        titulo=EXCLUDED.titulo, nivel=EXCLUDED.nivel, duracao=EXCLUDED.duracao, emoji=EXCLUDED.emoji,
+        imagem=EXCLUDED.imagem, descricao=EXCLUDED.descricao, link=EXCLUDED.link, brotos=EXCLUDED.brotos
+      `,
+      [c.id, c.titulo, c.nivel, c.duracao, c.emoji, c.imagem || null, c.descricao, c.link, c.brotos]
+    );
+
+    for (let i = 0; i < c.aulas.length; i++) {
+      await db.query(
+        "INSERT INTO curso_aulas (curso_id, ordem, titulo) VALUES ($1, $2, $3) ON CONFLICT (curso_id, ordem) DO NOTHING",
+        [c.id, i, c.aulas[i]]
+      );
+    }
   }
 
   for (const r of RECOMPENSAS) {
-    insertRecompensa.run({
-      id: r.id,
-      nome: r.nome,
-      descricao: r.desc,
-      custo: r.custo,
-      emoji: r.emoji,
-      tipo: r.tipo,
-      valor: r.valor ?? null
-    });
+    await db.query(
+      `
+      INSERT INTO recompensas (id, nome, descricao, custo, emoji, tipo, valor)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+      ON CONFLICT (id) DO UPDATE SET
+        nome=EXCLUDED.nome, descricao=EXCLUDED.descricao, custo=EXCLUDED.custo, emoji=EXCLUDED.emoji,
+        tipo=EXCLUDED.tipo, valor=EXCLUDED.valor
+      `,
+      [r.id, r.nome, r.desc, r.custo, r.emoji, r.tipo, r.valor ?? null]
+    );
   }
 
-  FAQ.forEach((f, i) => insertFaq.run(f.q, f.a, i));
-});
+  for (let i = 0; i < FAQ.length; i++) {
+    await db.query("INSERT INTO faq (pergunta, resposta, ordem) VALUES ($1, $2, $3)", [FAQ[i].q, FAQ[i].a, i]);
+  }
 
-run();
-console.log(`Seed OK: ${CATALOGO.length} plantas, ${CURSOS.length} cursos, ${RECOMPENSAS.length} recompensas, ${FAQ.length} FAQs.`);
+  console.log(
+    `Seed OK: ${CATALOGO.length} plantas, ${CURSOS.length} cursos, ${RECOMPENSAS.length} recompensas, ${FAQ.length} FAQs.`
+  );
+}
+
+seed()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("Erro no seed:", err);
+    process.exit(1);
+  });

@@ -1,33 +1,35 @@
 /**
- * Florescer — conexão e inicialização do SQLite
+ * Florescer — conexão com o Postgres (Supabase)
+ *
+ * O schema agora vive no Supabase (aplicado via migration), então este
+ * arquivo não recria mais tabelas ao subir o servidor — só abre a conexão.
  */
-const Database = require("better-sqlite3");
-const path = require("path");
-const fs = require("fs");
+const { Pool } = require("pg");
 
-const DB_PATH = path.join(__dirname, "data", "florescer.db");
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }, // necessário no Supabase
+  max: 5 // pool pequeno: o pooler do Supabase já gerencia o resto
+});
 
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-
-const db = new Database(DB_PATH);
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
-
-function resolveSchemaPath() {
-  // GitHub flat: schema.sql ao lado de db.js
-  const flat = path.join(__dirname, "schema.sql");
-  // Estrutura com pastas: ../schema.sql
-  const nested = path.join(__dirname, "..", "schema.sql");
-  if (fs.existsSync(flat)) return flat;
-  if (fs.existsSync(nested)) return nested;
-  throw new Error("schema.sql não encontrado. Coloque schema.sql na mesma pasta do db.js ou na pasta pai.");
+/**
+ * Executa uma sequência de queries dentro de uma transação.
+ * Uso: await transaction(async (client) => { await client.query(...); });
+ * Se qualquer query lançar erro, tudo é revertido (ROLLBACK).
+ */
+async function transaction(callback) {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await callback(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
-function initSchema() {
-  const sql = fs.readFileSync(resolveSchemaPath(), "utf8");
-  db.exec(sql);
-}
-
-initSchema();
-
-module.exports = db;
+module.exports = { db, transaction };
