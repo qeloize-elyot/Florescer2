@@ -368,7 +368,7 @@ function renderResumo() {
     t.brindes.length ? `<div class="resumo-linha"><span>Brindes</span><span>${t.brindes.length} item(ns)</span></div>` : "",
     `<div class="resumo-linha total"><span>Total</span><span>${brl(t.total)}</span></div>`,
     `<p class="small muted" style="margin-top:8px">Você ganhará <strong>${Math.floor(t.total)} Brotos</strong> nesta compra.</p>`,
-    t.brindes.length ? `<div class="aviso" style="margin-top:10px">🎁 ${t.brindes.join(" · ")}</div>` : ""
+    t.brindes.length ? `<div class="aviso" style="margin-top:10px">Brindes aplicados: ${t.brindes.join(" · ")}</div>` : ""
   ];
   $("#resumo").innerHTML = linhas.join("");
 }
@@ -651,8 +651,8 @@ function renderCursos() {
     const pct = Math.round((feitas / total) * 100);
     const concluido = c.progresso?.concluido;
     const capa = c.imagem
-      ? `<img src="${c.imagem}" alt="${c.titulo}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='grid')" /><span class="emoji-fallback" style="display:none">${c.emoji || ""}</span>`
-      : `<span class="emoji-fallback">${c.emoji || ""}</span>`;
+      ? `<img src="${c.imagem}" alt="${c.titulo}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling&&(this.nextElementSibling.style.display='grid')" /><span class="emoji-fallback" style="display:none">${(c.titulo||"C").charAt(0)}</span>`
+      : `<span class="emoji-fallback">${(c.titulo||"C").charAt(0)}</span>`;
     return `<article class="card">
       <div class="card-figura">${capa}</div>
       <div class="card-corpo">
@@ -966,7 +966,7 @@ async function renderConta() {
               <div class="small muted">${new Date(p.data).toLocaleDateString("pt-BR")} · ${p.itens.reduce((s, i) => s + i.qtd, 0)} item(ns) · ${brl(p.totais.total)}</div>
               <div class="small">${p.itens.map((i) => `${i.qtd}× ${i.nome}`).join(" · ")}</div>
               <div class="small muted">Envio: ${p.frete.regiao || "—"} · ${p.frete.prazo?.[0] || "?"}–${p.frete.prazo?.[1] || "?"} dias · ${p.pagamento.metodo === "cartao" ? p.pagamento.parcelas + "x cartão" : p.pagamento.metodo}</div>
-              ${p.presente ? `<div class="small">🎁 Presente para ${p.presente.para}</div>` : ""}
+              ${p.presente ? `<div class="small">Presente para ${p.presente.para}</div>` : ""}
               <div class="small" style="color:var(--verde-700)">+${p.brotosGanhos} Brotos</div>
             </div>`).join("") : '<p class="muted small">Nenhum pedido ainda.</p>'}
         </div>
