@@ -1,5 +1,3 @@
-
-
 /* =========================================================
 Florescer — Lógica da aplicação (API + banco de dados)
 Persistência: backend SQLite via REST API
