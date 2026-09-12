@@ -726,7 +726,12 @@ app.put("/api/me/endereco", auth, async (req, res, next) => {
     res.json({ usuario: publicUser(rows[0]) });
   } catch (err) { next(err); }
 });
-
+/* ---------- Flora ---------- */
+try {
+  require("./flora-api")(app, { db, mapPlanta, clean, rateLimit });
+} catch (e) {
+  console.warn("[Flora] módulo não carregou:", e.message);
+}
 /* ---------- Fallback SPA ---------- */
 app.get("*", (req, res) => {
   res.sendFile(path.join(frontendDir, "index.html"));
