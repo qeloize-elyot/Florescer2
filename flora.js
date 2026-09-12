@@ -69,7 +69,7 @@
         <span class="flora-bubble-pulse" aria-hidden="true"></span>
       </button>
 
-      <div id="flora-panel" class="flora-panel" hidden>
+      <div id="flora-panel" class="flora-panel" hidden style="display:none">
         <header class="flora-panel-head">
           <div class="flora-panel-who">
             <div class="flora-panel-avatar">
@@ -135,18 +135,27 @@
 
   function openPanel() {
     const panel = $("#flora-panel");
+    if (!panel) return;
     panel.hidden = false;
-    requestAnimationFrame(() => panel.classList.add("aberto"));
-    $("#flora-bubble").classList.add("escondido");
-    setTimeout(() => $("#flora-input")?.focus(), 200);
+    panel.style.display = "flex";
+    void panel.offsetWidth;
+    panel.classList.add("aberto");
+    $("#flora-bubble")?.classList.add("escondido");
+    setTimeout(() => {
+      try { $("#flora-input")?.focus(); } catch (_) {}
+    }, 250);
   }
 
   function closePanel() {
     pararFala();
     const panel = $("#flora-panel");
+    if (!panel) return;
     panel.classList.remove("aberto");
-    $("#flora-bubble").classList.remove("escondido");
-    setTimeout(() => { panel.hidden = true; }, 220);
+    $("#flora-bubble")?.classList.remove("escondido");
+    setTimeout(() => {
+      panel.hidden = true;
+      panel.style.display = "none";
+    }, 220);
   }
 
   function addMsg(role, text, store = true) {
