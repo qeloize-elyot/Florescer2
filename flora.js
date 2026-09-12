@@ -13,19 +13,54 @@
     if (v === "1") floraVozLigada = true;
   } catch (_) {}
 
+  /** Escolhe a melhor voz feminina em português disponível no aparelho. */
+  function vozFemininaPT() {
+    const voices = window.speechSynthesis.getVoices() || [];
+    if (!voices.length) return null;
+
+    const nomeFem = /female|feminina|mulher|woman|girl|maria|francisca|luciana|vit[oó]ria|victoria|helena|lisa|google português do brasil|microsoft maria|microsoft francisca/i;
+    const nomeMasc = /male|masculin|homem|man|daniel|ricardo|felipe|microsoft daniel/i;
+
+    const ptBR = voices.filter((v) => /pt-BR/i.test(v.lang));
+    const pt = ptBR.length ? ptBR : voices.filter((v) => /^pt\b/i.test(v.lang) || /pt-/i.test(v.lang));
+    const pool = pt.length ? pt : voices;
+
+    let v = pool.find((x) => nomeFem.test(x.name) && !nomeMasc.test(x.name));
+    if (v) return v;
+
+    v = ptBR.find((x) => !nomeMasc.test(x.name));
+    if (v) return v;
+
+    v = pool.find((x) => !nomeMasc.test(x.name));
+    if (v) return v;
+
+    return pool[0] || null;
+  }
+
   function falarFlora(texto) {
     if (!floraVozLigada) return;
     if (!window.speechSynthesis) return;
     try {
       window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(String(texto || ""));
+
+      let t = String(texto || "")
+        .replace(/[🌿🌱🪴✨🔊🔇]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!t) return;
+
+      const u = new SpeechSynthesisUtterance(t);
       u.lang = "pt-BR";
-      u.rate = 0.92;
-      u.pitch = 1.05;
-      const voices = window.speechSynthesis.getVoices() || [];
-      const pt = voices.find((v) => /pt-BR/i.test(v.lang))
-        || voices.find((v) => /pt/i.test(v.lang));
-      if (pt) u.voice = pt;
+      u.rate = 0.95;
+      u.pitch = 1.12;
+      u.volume = 1;
+
+      const voz = vozFemininaPT();
+      if (voz) {
+        u.voice = voz;
+        u.lang = voz.lang || "pt-BR";
+      }
+
       window.speechSynthesis.speak(u);
     } catch (_) {}
   }
