@@ -200,34 +200,64 @@ ${plantasCtx || "(nenhuma planta específica)"}`;
       .join("\n");
   }
 
+  function groqKey() {
+    return (
+      process.env.GROQ_API_KEY ||
+      process.env.GROQ_KEY ||
+      process.env.groq_api_key ||
+      ""
+    ).trim();
+  }
+
   async function chamarGroq(system, messages) {
-    const key = process.env.GROQ_API_KEY;
-    if (!key) return null;
-    try {
-      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + key
-        },
-        body: JSON.stringify({
-          model: process.env.FLORA_MODEL || "llama-3.1-8b-instant",
-          temperature: 0.5,
-          max_tokens: 350,
-          messages: [{ role: "system", content: system }, ...messages]
-        })
-      });
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        console.warn("[Flora/Groq]", res.status, errText.slice(0, 200));
-        return null;
-      }
-      const data = await res.json();
-      return data.choices?.[0]?.message?.content?.trim() || null;
-    } catch (e) {
-      console.warn("[Flora/Groq]", e.message);
+    const key = groqKey();
+    if (!key) {
+      console.warn("[Flora/Groq] sem chave (GROQ_API_KEY vazia no ambiente)");
       return null;
     }
+
+    const models = [
+      process.env.FLORA_MODEL,
+      "llama-3.1-8b-instant",
+      "llama-3.3-70b-versatile",
+      "openai/gpt-oss-20b",
+      "qwen/qwen3-32b",
+      "groq/compound-mini"
+    ].filter(Boolean);
+    const seen = new Set();
+    const list = models.filter((m) => (seen.has(m) ? false : (seen.add(m), true)));
+
+    for (const model of list) {
+      try {
+        const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + key
+          },
+          body: JSON.stringify({
+            model,
+            temperature: 0.5,
+            max_tokens: 350,
+            messages: [{ role: "system", content: system }, ...messages]
+          })
+        });
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          console.warn("[Flora/Groq]", model, res.status, errText.slice(0, 180));
+          continue;
+        }
+        const data = await res.json();
+        const text = data.choices?.[0]?.message?.content?.trim();
+        if (text) {
+          console.log("[Flora/Groq] ok com modelo", model);
+          return text;
+        }
+      } catch (e) {
+        console.warn("[Flora/Groq]", model, e.message);
+      }
+    }
+    return null;
   }
 
   async function chamarGemini(system, messages) {
