@@ -104,6 +104,20 @@
   text-align: center; padding: 0 12px 8px; background: var(--branco, #fff);
 }
 
+.flora-head-actions { display: flex; align-items: center; gap: 6px; }
+.flora-voz {
+  border: 1px solid var(--borda, #E0E5DC);
+  background: var(--branco, #fff);
+  color: var(--verde-900, #1E3A2F);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.flora-voz:hover { background: var(--verde-50, #F3F6F0); }
+.flora-voz.off { opacity: 0.65; }
+
 @media (max-width: 560px) {
   .flora-bubble { right: 14px; bottom: 14px; width: 56px; height: 56px; }
   .flora-panel { right: 8px; bottom: 8px; width: calc(100vw - 16px); height: min(70vh, 560px); }
